@@ -39,14 +39,23 @@ def generate_data(output: str | None, real_weather: bool):
         output: Optional output directory. Defaults to config path.
         real_weather: If True, fetches historical data from Open-Meteo API.
     """
-    from greengrid.data.generator import generate_dataset, save_dataset
+    from greengrid.data.generator import generate_dataset, fetch_real_weather, save_dataset
     from greengrid.settings import CFG
 
     logger.info(f"[CLI] Starting data generation (real_weather={real_weather})...")
     try:
-        # Pass the flag down to the generator
-        df = generate_dataset(CFG, use_real_weather=real_weather)
-        logger.debug(f"[CLI] Generated {len(df)} rows")
+        if real_weather:
+            # Fetch real weather from Open-Meteo API
+            dg = CFG["data_generation"]
+            tr = dg["time_range"]
+            wind_loc = dg["wind"]["location"]
+            df = fetch_real_weather(tr["start"], tr["end"], wind_loc["latitude"], wind_loc["longitude"])
+            logger.info(f"[CLI] Fetched real weather data: {len(df)} rows")
+        else:
+            # Generate synthetic data
+            df = generate_dataset(CFG)
+            logger.debug(f"[CLI] Generated {len(df)} rows")
+        
         path = save_dataset(df, output)
         logger.info(f"[CLI] Data saved to {path}")
         click.echo(f"Data saved to {path}")
@@ -159,7 +168,14 @@ def simulate(skip_training: bool, model: str):
                 checkpoints = list(checkpoint_dir.glob(f"{model}-epoch=*.ckpt"))
                 if checkpoints:
                     # Sort by val_loss (lower is better) extracted from filename
-                    best_ckpt = min(checkpoints, key=lambda p: float(p.stem.split("val_loss=")[1]))
+                    def extract_val_loss(p):
+                        # Extract val_loss value, handling cases like "0.0660-v1"
+                        loss_str = p.stem.split("val_loss=")[1]
+                        # Remove any suffix after the number (e.g., "-v1")
+                        loss_value = loss_str.split("-")[0] if "-" in loss_str else loss_str
+                        return float(loss_value)
+                    
+                    best_ckpt = min(checkpoints, key=extract_val_loss)
                     logger.info(f"[CLI] Loading checkpoint: {best_ckpt.name}")
                     trained_model = load_model(best_ckpt, model_type=model)
                 else:

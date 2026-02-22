@@ -1,7 +1,5 @@
 # GreenGrid
 
-**AI-driven smart grid controller for renewable forecasting and degradation-aware battery dispatch.**
-
 [![Python](https://img.shields.io/badge/python-3.13+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

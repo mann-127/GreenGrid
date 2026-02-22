@@ -1,7 +1,6 @@
 # GreenGrid
 
 [![Python](https://img.shields.io/badge/python-3.13+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ![System Architecture](assets/system-architecture.png)
 
@@ -24,7 +23,6 @@ Renewable energy sources like wind and solar are highly intermittent. When energ
 - Automated Airflow orchestration and Docker support
 
 ## Dashboard
-*(Add a screenshot of your Streamlit dashboard here to show off the UI)*
 > ![GreenGrid Streamlit Dashboard](assets/dashboard-preview.png)
 
 ---

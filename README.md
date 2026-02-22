@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.13+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![System Architecture](assets/system-architecture.drawio)
+![System Architecture](assets/system-architecture.png)
 
 ## Overview
 GreenGrid is an end-to-end Machine Learning pipeline designed to harmonize human energy demands with the physical constraints of renewable resources. By generating probabilistic weather forecasts and optimizing Battery Energy Storage System (BESS) dispatch, GreenGrid prevents energy waste while actively protecting the physical lifespan of the hardware.

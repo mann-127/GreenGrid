@@ -23,7 +23,7 @@ Renewable energy sources like wind and solar are highly intermittent. When energ
 - Automated Airflow orchestration and Docker support
 
 ## Dashboard
-> ![GreenGrid Streamlit Dashboard](assets/dashboard-preview.png)
+![GreenGrid Streamlit Dashboard](assets/dashboard-preview.png)
 
 ---
 

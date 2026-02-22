@@ -80,7 +80,6 @@ Generated data, checkpoints, logs, and results are created at runtime and are ig
 
 ## Project layout
 ```text
-.
 ├── greengrid/            # Core Python package
 │   ├── config.yaml       # Central configuration parameters
 │   ├── cli.py            # Unified command-line interface
@@ -122,13 +121,6 @@ The project includes a robust testing suite ensuring both software logic and phy
 ```bash
 uv run pytest --cov=greengrid --cov-report=term-missing
 ```
-
-## Contributing
-* Fork and create a feature branch from `master`
-* Add tests for new logic
-* Update docs if behavior changes
-
-See `CONTRIBUTING.md` for details.
 
 ## License
 MIT License. See `LICENSE`.

@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/python-3.13+-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![System Architecture](assets/system-architecture.drawio)
+![System Architecture](assets/system-architecture.png)
 
 ## Overview
 GreenGrid is an end-to-end Machine Learning pipeline designed to harmonize human energy demands with the physical constraints of renewable resources. By generating probabilistic weather forecasts and optimizing Battery Energy Storage System (BESS) dispatch, GreenGrid prevents energy waste while actively protecting the physical lifespan of the hardware.
@@ -78,7 +78,6 @@ Generated data, checkpoints, logs, and results are created at runtime and are ig
 
 ## Project layout
 ```text
-.
 ├── greengrid/            # Core Python package
 │   ├── config.yaml       # Central configuration parameters
 │   ├── cli.py            # Unified command-line interface
@@ -120,13 +119,6 @@ The project includes a robust testing suite ensuring both software logic and phy
 ```bash
 uv run pytest --cov=greengrid --cov-report=term-missing
 ```
-
-## Contributing
-* Fork and create a feature branch from `master`
-* Add tests for new logic
-* Update docs if behavior changes
-
-See `CONTRIBUTING.md` for details.
 
 ## License
 MIT License. See `LICENSE`.

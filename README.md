@@ -1,8 +1,8 @@
 # GreenGrid: Smart Grid Controller
 
-![Python](https://img.shields.io/badge/python-3.13+-green)
+![Python Version](https://img.shields.io/badge/python-3.13+-green.svg)
 ![Code Size](https://img.shields.io/github/languages/code-size/mann-127/GreenGrid)
-![GitHub Stars](https://img.shields.io/github/stars/mann-127/MiniGit?style=social)
+![GitHub Stars](https://img.shields.io/github/stars/mann-127/GreenGrid?style=social)
 
 ![System Architecture](assets/system-architecture.png)
 

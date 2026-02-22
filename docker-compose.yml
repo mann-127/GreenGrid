@@ -1,0 +1,48 @@
+services:
+  # ── Data generation & training ─────────────────
+  greengrid:
+    build:
+      context: .
+      target: base
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    command: ["simulate", "--skip-training"]
+
+  # ── Streamlit Dashboard ────────────────────────
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - greengrid
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Airflow Scheduler ──────────────────────────
+  airflow:
+    build:
+      context: .
+      target: airflow
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./airflow/dags:/app/airflow/dags
+      - ./data:/app/data
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 40s

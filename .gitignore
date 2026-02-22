@@ -1,0 +1,67 @@
+# Byte-compiled / Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+greengrid.egg-info/
+.eggs/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Linting / Type checking
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Data artefacts
+data/raw/*
+!data/raw/greengrid_raw.csv
+data/processed/
+*.h5
+*.ckpt
+
+# Model checkpoints
+models/checkpoints/
+models/checkpoints/*.ckpt
+
+# Logs and results
+logs/
+results/
+logs/*.log
+logs/*.json
+results/*.json
+results/*.csv
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+
+# Training/Experiment artifacts
+lightning_logs/
+
+# Misc
+.DS_Store
+*.log
+.env

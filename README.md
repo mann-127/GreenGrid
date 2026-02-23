@@ -1,4 +1,4 @@
-# GreenGrid: Smart Grid Controller
+# GreenGrid: Renewable Energy Dispatch Optimizer
 
 ![Python Version](https://img.shields.io/badge/python-3.13+-green.svg)
 ![Code Size](https://img.shields.io/github/languages/code-size/mann-127/GreenGrid)

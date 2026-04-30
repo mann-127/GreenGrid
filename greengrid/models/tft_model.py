@@ -85,9 +85,7 @@ class VariableSelectionNetwork(nn.Module):
         super().__init__()
         self.n_vars = n_vars
         self.flattened_grn = GatedResidualNetwork(n_vars * d_model, d_hidden, dropout)
-        self.var_grns = nn.ModuleList(
-            [GatedResidualNetwork(d_model, d_hidden, dropout) for _ in range(n_vars)]
-        )
+        self.var_grns = nn.ModuleList([GatedResidualNetwork(d_model, d_hidden, dropout) for _ in range(n_vars)])
         self.gate = nn.Linear(n_vars * d_model, n_vars)
         self.softmax = nn.Softmax(dim=-1)
 
@@ -125,9 +123,7 @@ class InterpretableMultiHeadAttention(nn.Module):
         self.out_proj = nn.Linear(self.d_k, d_model)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(
-        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         B, T, _ = q.shape
 
         Q = self.W_q(q).view(B, T, self.n_heads, self.d_k).transpose(1, 2)  # (B, H, T, dk)
@@ -244,9 +240,7 @@ class TemporalFusionTransformer(pl.LightningModule):
         pred = self(x)
         loss = quantile_loss(pred, y, self.quantiles)
         self.log("val_loss", loss, prog_bar=True)
-        median_idx = (
-            self.quantiles.index(0.50) if 0.50 in self.quantiles else len(self.quantiles) // 2
-        )
+        median_idx = self.quantiles.index(0.50) if 0.50 in self.quantiles else len(self.quantiles) // 2
         point = pred[:, :, :, median_idx]
         rmse = torch.sqrt(((point - y) ** 2).mean())
         self.log("val_rmse", rmse, prog_bar=True)

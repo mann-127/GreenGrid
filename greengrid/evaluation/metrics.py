@@ -103,9 +103,7 @@ def curtailment_reduction(
     """
     if baseline_curtailment_mwh <= 0:
         return 0.0
-    return float(
-        (baseline_curtailment_mwh - model_curtailment_mwh) / baseline_curtailment_mwh * 100
-    )
+    return float((baseline_curtailment_mwh - model_curtailment_mwh) / baseline_curtailment_mwh * 100)
 
 
 def revenue_improvement(

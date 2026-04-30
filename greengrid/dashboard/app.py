@@ -157,12 +157,8 @@ elif page == "Forecasting":
             (0.25, 0.75, "rgba(31,119,180,0.3)"),
         ]:
             if q_lo in baseline.quantiles and q_hi in baseline.quantiles:
-                lo = data.target_scaler.inverse_transform(
-                    baseline.quantiles[q_lo][sample_idx].reshape(-1, 2)
-                )[:, t]
-                hi = data.target_scaler.inverse_transform(
-                    baseline.quantiles[q_hi][sample_idx].reshape(-1, 2)
-                )[:, t]
+                lo = data.target_scaler.inverse_transform(baseline.quantiles[q_lo][sample_idx].reshape(-1, 2))[:, t]
+                hi = data.target_scaler.inverse_transform(baseline.quantiles[q_hi][sample_idx].reshape(-1, 2))[:, t]
                 fig.add_trace(
                     go.Scatter(
                         x=hours + hours[::-1],

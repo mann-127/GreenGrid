@@ -42,10 +42,7 @@ _SOLAR_EQUINOX_DOY = 81
 # ── Real Weather Fetching ──────────────────────────────────────────────
 def fetch_real_weather(start_date: str, end_date: str, lat: float, lon: float) -> pd.DataFrame:
     """Fetch real historical weather data from the Open-Meteo Archive API."""
-    logger.info(
-        f"[generator] Fetching real weather data for {lat}, {lon} "
-        f"from {start_date} to {end_date}..."
-    )
+    logger.info(f"[generator] Fetching real weather data for {lat}, {lon} from {start_date} to {end_date}...")
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude": lat,
@@ -113,10 +110,7 @@ def _generate_wind_speed(timestamps: pd.DatetimeIndex, seed: int) -> np.ndarray:
 
     # Seasonal scale: stronger in winter (Dec-Feb) & spring
     seasonal_scale = 8.0 + 3.0 * np.cos(2 * np.pi * (months - 1) / 12.0)
-    logger.debug(
-        f"[generator] Seasonal scale range: [{seasonal_scale.min():.2f}, "
-        f"{seasonal_scale.max():.2f}] m/s"
-    )
+    logger.debug(f"[generator] Seasonal scale range: [{seasonal_scale.min():.2f}, {seasonal_scale.max():.2f}] m/s")
 
     # Diurnal pattern: peak around 14:00, trough around 04:00
     diurnal = 1.0 + _WIND_DIURNAL_AMP * np.sin(2 * np.pi * (hours - 6) / 24.0)
@@ -168,9 +162,7 @@ def _wind_power_curve(
         Power output in MW. Shape (n_hours,).
     """
     if rated_speed <= cut_in:
-        raise ValueError(
-            f"rated_speed ({rated_speed} m/s) must be greater than cut_in ({cut_in} m/s)"
-        )
+        raise ValueError(f"rated_speed ({rated_speed} m/s) must be greater than cut_in ({cut_in} m/s)")
     power = np.zeros_like(wind_speed)
     # Region II — cubic ramp (physics: power proportional to wind_speed^3)
     mask_ramp = (wind_speed >= cut_in) & (wind_speed < rated_speed)
@@ -180,16 +172,13 @@ def _wind_power_curve(
     power[mask_rated] = rated_mw
 
     logger.debug(
-        f"[generator] Wind power curve: {power.sum():.1f} MWh total, "
-        f"capacity factor={(power.mean() / rated_mw):.1%}"
+        f"[generator] Wind power curve: {power.sum():.1f} MWh total, capacity factor={(power.mean() / rated_mw):.1%}"
     )
     return power.astype(np.float32)
 
 
 # ── Solar irradiance physics ──────────────────────────────────────────
-def _generate_solar_irradiance(
-    timestamps: pd.DatetimeIndex, latitude: float, seed: int
-) -> np.ndarray:
+def _generate_solar_irradiance(timestamps: pd.DatetimeIndex, latitude: float, seed: int) -> np.ndarray:
     """
     Approximate Global Horizontal Irradiance (GHI) in W/m² using a
     clear-sky cosine model with cloud-cover perturbation.
@@ -207,9 +196,7 @@ def _generate_solar_irradiance(
     lat_rad = np.radians(latitude)
     dec_rad = np.radians(declination)
     ha_rad = np.radians(hour_angle)
-    sin_elev = np.sin(lat_rad) * np.sin(dec_rad) + np.cos(lat_rad) * np.cos(dec_rad) * np.cos(
-        ha_rad
-    )
+    sin_elev = np.sin(lat_rad) * np.sin(dec_rad) + np.cos(lat_rad) * np.cos(dec_rad) * np.cos(ha_rad)
     sin_elev = np.clip(sin_elev, 0, 1)
 
     # Clear-sky GHI
@@ -352,9 +339,7 @@ def generate_dataset(cfg: dict | None = None) -> pd.DataFrame:
     temperature = _generate_temperature(timestamps, dg["wind"]["location"]["latitude"], seed)
     humidity = _generate_humidity(temperature, seed)
     pressure = _generate_pressure(timestamps, seed)
-    ghi, cloud_cover = _generate_solar_irradiance(
-        timestamps, dg["solar"]["location"]["latitude"], seed
-    )
+    ghi, cloud_cover = _generate_solar_irradiance(timestamps, dg["solar"]["location"]["latitude"], seed)
 
     # ── Power production ──────────────────────────────────────────────
     wc = dg["wind"]

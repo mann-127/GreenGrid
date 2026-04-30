@@ -117,9 +117,7 @@ def calibration_report(
         emp = empirical_coverage(actual, pi.lower, pi.upper)
         gap = emp - pi.level
         report[pi.level] = {"nominal": pi.level, "empirical": emp, "gap": gap}
-        logger.info(
-            f"  PI {pi.level:.0%}:  empirical={emp:.3f}  nominal={pi.level:.3f}  gap={gap:+.3f}"
-        )
+        logger.info(f"  PI {pi.level:.0%}:  empirical={emp:.3f}  nominal={pi.level:.3f}  gap={gap:+.3f}")
     return report
 
 

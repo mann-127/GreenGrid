@@ -47,9 +47,7 @@ class BatteryConfig:
             max_soc=b["max_soc"],
             degradation_per_cycle=(cfg or CFG)["optimizer"]["storage_degradation_per_cycle"],
             # Fetch calendar aging if it exists in config, otherwise use default
-            calendar_aging_per_hour=(cfg or CFG)
-            .get("optimizer", {})
-            .get("calendar_aging_per_hour", 0.000002),
+            calendar_aging_per_hour=(cfg or CFG).get("optimizer", {}).get("calendar_aging_per_hour", 0.000002),
         )
 
 
@@ -107,8 +105,7 @@ class Battery:
         action_mw_clipped = np.clip(action_mw, -self.cfg.max_discharge_mw, self.cfg.max_charge_mw)
         if abs(action_mw_clipped - action_mw) > 1e-6:
             logger.debug(
-                f"[battery] Rate limit clipping: requested={action_mw:.2f}MW, "
-                f"clipped={action_mw_clipped:.2f}MW"
+                f"[battery] Rate limit clipping: requested={action_mw:.2f}MW, clipped={action_mw_clipped:.2f}MW"
             )
 
         eta = np.sqrt(self.cfg.efficiency)  # symmetric split: η_c = η_d = √η_rt

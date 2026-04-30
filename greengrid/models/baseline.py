@@ -75,9 +75,7 @@ def fit_baseline(
 
     best_rmse = float("inf")
     best_window = window_sizes[0]
-    best_pred: np.ndarray = moving_average_forecast(
-        val_X, horizon, min(best_window, val_X.shape[1])
-    )
+    best_pred: np.ndarray = moving_average_forecast(val_X, horizon, min(best_window, val_X.shape[1]))
 
     for w in window_sizes:
         pred = moving_average_forecast(val_X, horizon, min(w, val_X.shape[1]))
@@ -96,9 +94,7 @@ def fit_baseline(
 
     # Use a shared quantile list if defined; fall back to sensible defaults.
     # Previously this accidentally read from the LSTM config block.
-    quantile_levels = (
-        cfg["models"].get("quantiles") or mcfg.get("quantiles") or [0.05, 0.25, 0.50, 0.75, 0.95]
-    )
+    quantile_levels = cfg["models"].get("quantiles") or mcfg.get("quantiles") or [0.05, 0.25, 0.50, 0.75, 0.95]
     quantile_forecasts: dict[float, np.ndarray] = {}
     for q in quantile_levels:
         q_offset = np.quantile(residuals, q, axis=0)  # (horizon, T)

@@ -97,9 +97,7 @@ def load_raw(path: str | Path | None = None) -> pd.DataFrame:
     if df is None:
         csv = data_dir / "greengrid_raw.csv"
         if not csv.exists():
-            raise FileNotFoundError(
-                f"No raw data found. Run 'greengrid generate-data' first. Looked for: {pq}, {csv}"
-            )
+            raise FileNotFoundError(f"No raw data found. Run 'greengrid generate-data' first. Looked for: {pq}, {csv}")
         logger.debug(f"[preprocessing] Reading CSV: {csv}")
         df = pd.read_csv(csv, parse_dates=["timestamp"])
 
@@ -133,15 +131,12 @@ def _chronological_split(
     i_val = i_train + int(n * val_ratio)
 
     logger.debug(
-        f"[preprocessing] Chronological split: train=[0:{i_train}], "
-        f"val=[{i_train}:{i_val}], test=[{i_val}:{n}]"
+        f"[preprocessing] Chronological split: train=[0:{i_train}], val=[{i_train}:{i_val}], test=[{i_val}:{n}]"
     )
     return df.iloc[:i_train], df.iloc[i_train:i_val], df.iloc[i_val:]
 
 
-def _fit_scaler(
-    kind: Literal["standard", "minmax"], train: np.ndarray
-) -> StandardScaler | MinMaxScaler:
+def _fit_scaler(kind: Literal["standard", "minmax"], train: np.ndarray) -> StandardScaler | MinMaxScaler:
     """Fit a scaler (StandardScaler or MinMaxScaler) on training data only.
 
     IMPORTANT: Scaler is fit on training data only to prevent data leakage.

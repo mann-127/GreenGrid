@@ -96,18 +96,11 @@ def preprocess(input_dir):
         logger.debug(f"[CLI] Loaded {len(df)} raw samples")
 
         data = prepare_data(df)
-        logger.debug(
-            "[CLI] Splits: "
-            f"train={len(data.train.X)}, "
-            f"val={len(data.val.X)}, "
-            f"test={len(data.test.X)}"
-        )
+        logger.debug(f"[CLI] Splits: train={len(data.train.X)}, val={len(data.val.X)}, test={len(data.test.X)}")
         logger.info(f"[CLI] Preprocessing complete with {len(data.feature_columns)} features")
 
         click.echo(
-            f"Preprocessing complete: "
-            f"train={len(data.train.X):,}  val={len(data.val.X):,}  "
-            f"test={len(data.test.X):,}"
+            f"Preprocessing complete: train={len(data.train.X):,}  val={len(data.val.X):,}  test={len(data.test.X):,}"
         )
     except Exception as e:
         logger.error(f"[CLI] Preprocessing failed: {e}")

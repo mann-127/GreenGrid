@@ -144,9 +144,7 @@ class ProbabilisticLSTM(pl.LightningModule):
     # ── Optimizer ────────────────────────────────────────────────────
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-4)
-        sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            opt, T_0=10, T_mult=2, eta_min=1e-6
-        )
+        sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opt, T_0=10, T_mult=2, eta_min=1e-6)
         return {
             "optimizer": opt,
             "lr_scheduler": {"scheduler": sched, "interval": "epoch"},

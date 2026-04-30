@@ -115,9 +115,7 @@ def run_simulation(
 
     # Evaluate on test
     horizon = test.y.shape[1]
-    test_baseline_pred = moving_average_forecast(
-        test.y, horizon, min(baseline_result.best_window, test.y.shape[1])
-    )
+    test_baseline_pred = moving_average_forecast(test.y, horizon, min(baseline_result.best_window, test.y.shape[1]))
 
     # Inverse-scale predictions and actuals for real-world metrics
     def _inv(arr: np.ndarray) -> np.ndarray:
@@ -226,12 +224,12 @@ def run_simulation(
     for i in range(n_samples):
         # Baseline forecast (moving-average)
         ren_baseline_median = baseline_point_mw[i, :, :].sum(axis=-1)
-        ren_baseline_lower = baseline_quantiles_mw.get(
-            0.05, baseline_quantiles_mw[min(baseline_quantiles_mw)]
-        )[i, :, :].sum(axis=-1)
-        ren_baseline_upper = baseline_quantiles_mw.get(
-            0.95, baseline_quantiles_mw[max(baseline_quantiles_mw)]
-        )[i, :, :].sum(axis=-1)
+        ren_baseline_lower = baseline_quantiles_mw.get(0.05, baseline_quantiles_mw[min(baseline_quantiles_mw)])[
+            i, :, :
+        ].sum(axis=-1)
+        ren_baseline_upper = baseline_quantiles_mw.get(0.95, baseline_quantiles_mw[max(baseline_quantiles_mw)])[
+            i, :, :
+        ].sum(axis=-1)
 
         # LSTM forecast
         ren_model_median = model_point_mw[i, :, :].sum(axis=-1)

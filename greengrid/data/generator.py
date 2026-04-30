@@ -334,12 +334,25 @@ def generate_dataset(cfg: dict | None = None) -> pd.DataFrame:
     logger.info(f"Generating {len(timestamps):,} hourly records ({tr['start']} to {tr['end']})")
 
     # ── Weather features ──────────────────────────────────────────────
-    wind_speed = _generate_wind_speed(timestamps, seed)
-    wind_dir = _generate_wind_direction(timestamps, seed)
-    temperature = _generate_temperature(timestamps, dg["wind"]["location"]["latitude"], seed)
-    humidity = _generate_humidity(temperature, seed)
-    pressure = _generate_pressure(timestamps, seed)
-    ghi, cloud_cover = _generate_solar_irradiance(timestamps, dg["solar"]["location"]["latitude"], seed)
+    if dg.get("use_real_weather", False):
+        lat = dg["wind"]["location"]["latitude"]
+        lon = dg["wind"]["location"]["longitude"]
+        weather_df = fetch_real_weather(tr["start"], tr["end"], lat, lon)
+        timestamps = pd.DatetimeIndex(weather_df["timestamp"])
+        wind_speed = weather_df["wind_speed_ms"].to_numpy()
+        wind_dir = weather_df["wind_direction_deg"].to_numpy()
+        temperature = weather_df["temperature_c"].to_numpy()
+        humidity = weather_df["humidity_pct"].to_numpy()
+        pressure = weather_df["pressure_hpa"].to_numpy()
+        ghi = weather_df["ghi_wm2"].to_numpy()
+        cloud_cover = weather_df["cloud_cover_pct"].to_numpy() / 100.0
+    else:
+        wind_speed = _generate_wind_speed(timestamps, seed)
+        wind_dir = _generate_wind_direction(timestamps, seed)
+        temperature = _generate_temperature(timestamps, dg["wind"]["location"]["latitude"], seed)
+        humidity = _generate_humidity(temperature, seed)
+        pressure = _generate_pressure(timestamps, seed)
+        ghi, cloud_cover = _generate_solar_irradiance(timestamps, dg["solar"]["location"]["latitude"], seed)
 
     # ── Power production ──────────────────────────────────────────────
     wc = dg["wind"]

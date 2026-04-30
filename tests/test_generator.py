@@ -81,6 +81,12 @@ class TestDataGenerator:
         """Test that the generator correctly calls the external weather API."""
         from unittest.mock import patch
 
+        sample_cfg["data_generation"]["use_real_weather"] = True
+        sample_cfg["data_generation"]["time_range"] = {
+            "start": "2023-01-01",
+            "end": "2023-01-01",
+            "freq": "1h",
+        }
         with patch("greengrid.data.generator.fetch_real_weather") as mock_fetch:
             mock_df = pd.DataFrame(
                 {

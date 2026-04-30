@@ -1,0 +1,133 @@
+# ──────────────────────────────────────────────────
+# GreenGrid Master Configuration — Example
+# Copy to config.yml and adjust values as needed.
+# The real config.yml is gitignored.
+# ──────────────────────────────────────────────────
+
+project:
+  name: GreenGrid
+  version: "1.0.0"
+  # Random seed for reproducibility. Override at runtime with GREENGRID_SEED env var.
+  seed: 42
+
+# ── Paths ──────────────────────────────────────────
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  models: models/checkpoints
+  logs: logs
+  results: results
+
+# ── Synthetic Data Generation ─────────────────────
+data_generation:
+  wind:
+    num_turbines: 50
+    rated_capacity_mw: 3.0          # per turbine → 150 MW farm
+    hub_height_m: 80
+    cut_in_speed_ms: 3.0
+    rated_speed_ms: 12.0
+    cut_out_speed_ms: 25.0
+    location:
+      latitude: 41.25               # Iowa-style wind corridor
+      longitude: -95.85
+  solar:
+    capacity_mw: 80.0
+    panel_efficiency: 0.20
+    temperature_coeff: -0.004       # %/°C loss
+    location:
+      latitude: 35.05               # New Mexico
+      longitude: -106.60
+  battery:
+    capacity_mwh: 200.0
+    max_charge_rate_mw: 50.0
+    max_discharge_rate_mw: 50.0
+    round_trip_efficiency: 0.88
+    initial_soc: 0.5                # state-of-charge [0,1]
+    min_soc: 0.10
+    max_soc: 0.95
+  time_range:
+    start: "2022-01-01"
+    end: "2024-12-31"
+    freq: "1h"                      # hourly resolution
+
+# ── Preprocessing ──────────────────────────────────
+preprocessing:
+  target_columns:
+    - wind_power_mw
+    - solar_power_mw
+  feature_columns:
+    - wind_speed_ms
+    - wind_direction_deg
+    - temperature_c
+    - humidity_pct
+    - pressure_hpa
+    - ghi_wm2
+    - cloud_cover_pct
+    - hour_sin
+    - hour_cos
+    - month_sin
+    - month_cos
+  sequence_length: 168              # 7 days look-back
+  forecast_horizon: 24              # 24-h ahead forecast
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  scaler: standard                  # standard | minmax
+
+# ── Models ─────────────────────────────────────────
+models:
+  baseline:
+    type: moving_average
+    window_sizes: [6, 12, 24, 48, 168]
+
+  lstm:
+    hidden_size: 256
+    num_layers: 3
+    dropout: 0.3
+    bidirectional: true
+    learning_rate: 0.0002
+    batch_size: 32
+    max_epochs: 150
+    patience: 20
+    gradient_clip_val: 1.0
+    quantiles: [0.05, 0.25, 0.50, 0.75, 0.95]
+
+  tft:
+    hidden_size: 160
+    attention_head_size: 4
+    num_attention_heads: 4
+    hidden_continuous_size: 64
+    dropout: 0.1
+    learning_rate: 0.0005
+    batch_size: 64
+    max_epochs: 120
+    patience: 12
+    quantiles: [0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95]
+
+# ── Grid Optimizer ─────────────────────────────────
+optimizer:
+  electricity_sell_price_mwh: 45.0    # $/MWh (off-peak)
+  electricity_peak_price_mwh: 120.0   # $/MWh (peak)
+  peak_hours: [7, 8, 9, 10, 17, 18, 19, 20]
+  curtailment_penalty_mwh: 30.0
+  storage_degradation_per_cycle: 0.0001
+  calendar_aging_per_hour: 0.000002
+  cycle_penalty_cost_mwh: 15.0
+
+# ── Evaluation ─────────────────────────────────────
+evaluation:
+  metrics:
+    - mae
+    - rmse
+    - mape
+    - pinball_loss
+    - coverage_90
+    - curtailment_reduction_pct
+  target_curtailment_reduction: 0.15   # 15% improvement goal
+
+# ── Airflow ────────────────────────────────────────
+airflow:
+  dag_schedule: "0 */6 * * *"         # every 6 hours
+  catchup: false
+  retries: 2
+  retry_delay_minutes: 5

@@ -4,13 +4,11 @@ Evaluation Metrics
 Forecasting & grid-optimisation metrics used to compare models.
 """
 
-from __future__ import annotations
-
 import numpy as np
 from loguru import logger
 
-
 # ── Point-forecast metrics ───────────────────────────────────────────
+
 
 def mae(actual: np.ndarray, predicted: np.ndarray) -> float:
     """Mean Absolute Error."""
@@ -35,6 +33,7 @@ def r_squared(actual: np.ndarray, predicted: np.ndarray) -> float:
 
 
 # ── Probabilistic metrics ───────────────────────────────────────────
+
 
 def pinball_loss(
     actual: np.ndarray,
@@ -93,6 +92,7 @@ def winkler_score(
 
 # ── Grid / curtailment metrics ───────────────────────────────────────
 
+
 def curtailment_reduction(
     baseline_curtailment_mwh: float,
     model_curtailment_mwh: float,
@@ -104,9 +104,7 @@ def curtailment_reduction(
     if baseline_curtailment_mwh <= 0:
         return 0.0
     return float(
-        (baseline_curtailment_mwh - model_curtailment_mwh)
-        / baseline_curtailment_mwh
-        * 100
+        (baseline_curtailment_mwh - model_curtailment_mwh) / baseline_curtailment_mwh * 100
     )
 
 
@@ -121,6 +119,7 @@ def revenue_improvement(
 
 
 # ── Comprehensive report ─────────────────────────────────────────────
+
 
 def compute_all_metrics(
     actual: np.ndarray,

@@ -36,14 +36,15 @@ htmlcov/
 
 # Data artefacts
 data/raw/*
-!data/raw/greengrid_raw.csv
+!data/raw/.gitkeep
 data/processed/
 *.h5
 *.ckpt
+*.pth
+*.pkl
 
-# Model checkpoints
+# Model checkpoints (entire directory; specific patterns below are redundant)
 models/checkpoints/
-models/checkpoints/*.ckpt
 
 # Logs and results
 logs/
@@ -64,4 +65,12 @@ lightning_logs/
 # Misc
 .DS_Store
 *.log
+*.jsonl
 .env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Config overrides (committed example; real file is gitignored)
+config.yml

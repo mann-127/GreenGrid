@@ -8,6 +8,18 @@ services:
       - ./data:/app/data
       - ./models:/app/models
     command: ["simulate", "--skip-training"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: "2.0"
+    healthcheck:
+      test: ["CMD", "greengrid", "--help"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   # ── Streamlit Dashboard ────────────────────────
   dashboard:
@@ -19,13 +31,20 @@ services:
     volumes:
       - ./data:/app/data
     depends_on:
-      - greengrid
+      greengrid:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "1.0"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
 
   # ── Airflow Scheduler ──────────────────────────
   airflow:
@@ -36,13 +55,20 @@ services:
       - "8080:8080"
     volumes:
       - ./airflow/dags:/app/airflow/dags
+      - ./airflow/logs:/app/airflow/logs
       - ./data:/app/data
     environment:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__DAGS_FOLDER=/app/airflow/dags
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "1.0"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 15s
       timeout: 5s
       retries: 8
-      start_period: 40s
+      start_period: 60s

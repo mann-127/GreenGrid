@@ -5,32 +5,40 @@ Unified training entry-point for both LSTM and TFT models using
 PyTorch Lightning.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytorch_lightning as pl
-import torch
 from loguru import logger
-from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
+from pytorch_lightning.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
 
 from greengrid.data.preprocessing import PreparedData, build_dataloaders
 from greengrid.models.lstm_model import ProbabilisticLSTM
 from greengrid.models.tft_model import TemporalFusionTransformer
 from greengrid.settings import CFG
-from greengrid.utils import ensure_dir, get_device
+from greengrid.utils import ensure_dir
 
 
 def _build_callbacks(model_name: str, patience: int, ckpt_dir: Path) -> list:
+    checkpoint = ModelCheckpoint(
+        dirpath=str(ckpt_dir),
+        filename=f"{model_name}-{{epoch:02d}}-{{val_loss:.4f}}",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=3,
+    )
     return [
-        EarlyStopping(monitor="val_loss", patience=patience, mode="min", verbose=True, min_delta=0.0001),
-        ModelCheckpoint(
-            dirpath=str(ckpt_dir),
-            filename=f"{model_name}-{{epoch:02d}}-{{val_loss:.4f}}",
+        EarlyStopping(
             monitor="val_loss",
+            patience=patience,
             mode="min",
-            save_top_k=3,
+            verbose=True,
+            min_delta=0.0001,
         ),
+        checkpoint,
         LearningRateMonitor(logging_interval="epoch"),
     ]
 
@@ -70,15 +78,35 @@ def train_lstm(data: PreparedData, cfg: dict | None = None) -> ProbabilisticLSTM
         log_every_n_steps=20,
         enable_progress_bar=True,
     )
+    callbacks = _build_callbacks("lstm", mc["patience"], ckpt_dir)
+    trainer = pl.Trainer(
+        max_epochs=mc["max_epochs"],
+        callbacks=callbacks,
+        gradient_clip_val=mc.get("gradient_clip_val", 1.0),
+        accelerator="auto",
+        devices=1,
+        log_every_n_steps=20,
+        enable_progress_bar=True,
+    )
     trainer.fit(model, train_loader, val_loader)
 
-    # Load best checkpoint
-    best_path = trainer.checkpoint_callback.best_model_path
-    if best_path:
-        logger.success(f"LSTM best checkpoint: {best_path}")
-        model = ProbabilisticLSTM.load_from_checkpoint(best_path)
-
-    return model
+    checkpoint_callback = next(
+        (cb for cb in callbacks if isinstance(cb, ModelCheckpoint)),
+        None,
+    )
+    if checkpoint_callback is None:
+        raise RuntimeError(
+            "LSTM training produced no checkpoint. "
+            "Check that validation data is non-empty and at least one epoch completed."
+        )
+    best_path = checkpoint_callback.best_model_path
+    if not best_path:
+        raise RuntimeError(
+            "LSTM training produced no checkpoint. "
+            "Check that validation data is non-empty and at least one epoch completed."
+        )
+    logger.success(f"LSTM best checkpoint: {best_path}")
+    return ProbabilisticLSTM.load_from_checkpoint(best_path)
 
 
 def train_tft(data: PreparedData, cfg: dict | None = None) -> TemporalFusionTransformer:
@@ -97,7 +125,7 @@ def train_tft(data: PreparedData, cfg: dict | None = None) -> TemporalFusionTran
         n_targets=n_targets,
         horizon=horizon,
         hidden_size=mc["hidden_size"],
-        n_heads=mc.get("num_attention_heads", 4),
+        n_heads=mc["num_attention_heads"],
         dropout=mc["dropout"],
         learning_rate=mc["learning_rate"],
         quantiles=mc["quantiles"],
@@ -114,14 +142,35 @@ def train_tft(data: PreparedData, cfg: dict | None = None) -> TemporalFusionTran
         log_every_n_steps=20,
         enable_progress_bar=True,
     )
+    callbacks = _build_callbacks("tft", mc["patience"], ckpt_dir)
+    trainer = pl.Trainer(
+        max_epochs=mc["max_epochs"],
+        callbacks=callbacks,
+        accelerator="auto",
+        devices=1,
+        log_every_n_steps=20,
+        enable_progress_bar=True,
+    )
     trainer.fit(model, train_loader, val_loader)
 
-    best_path = trainer.checkpoint_callback.best_model_path
-    if best_path:
-        logger.success(f"TFT best checkpoint: {best_path}")
-        model = TemporalFusionTransformer.load_from_checkpoint(best_path)
+    checkpoint_callback = next(
+        (cb for cb in callbacks if isinstance(cb, ModelCheckpoint)),
+        None,
+    )
+    if checkpoint_callback is None:
+        raise RuntimeError(
+            "TFT training produced no checkpoint. "
+            "Check that validation data is non-empty and at least one epoch completed."
+        )
 
-    return model
+    best_path = checkpoint_callback.best_model_path
+    if not best_path:
+        raise RuntimeError(
+            "TFT training produced no checkpoint. "
+            "Check that validation data is non-empty and at least one epoch completed."
+        )
+    logger.success(f"TFT best checkpoint: {best_path}")
+    return TemporalFusionTransformer.load_from_checkpoint(best_path)
 
 
 def load_model(path: str | Path, model_type: str = "lstm") -> pl.LightningModule:

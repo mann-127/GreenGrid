@@ -11,33 +11,30 @@ End-to-end simulation that:
   7. Checks whether the 15% curtailment-reduction target is met.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 import torch
 from loguru import logger
 
 from greengrid.data.generator import generate_dataset, save_dataset
-from greengrid.data.preprocessing import PreparedData, prepare_data, build_dataloaders
+from greengrid.data.preprocessing import prepare_data
 from greengrid.evaluation.metrics import (
     compute_all_metrics,
     curtailment_reduction,
     revenue_improvement,
 )
-from greengrid.models.baseline import fit_baseline
-from greengrid.models.probabilistic import extract_intervals, calibration_report
+from greengrid.models.probabilistic import calibration_report, extract_intervals
 from greengrid.optimizer.battery import BatteryConfig
-from greengrid.optimizer.dispatch import ForecastDispatch, NaiveDispatch, DispatchResult
+from greengrid.optimizer.dispatch import DispatchResult, ForecastDispatch
 from greengrid.settings import CFG
-from greengrid.utils import set_seed, get_device
+from greengrid.utils import get_device, set_seed
 
 
 @dataclass
 class SimulationReport:
     """Final comparison report."""
+
     baseline_metrics: dict[str, float]
     model_metrics: dict[str, float]
     baseline_dispatch: DispatchResult
@@ -51,8 +48,8 @@ class SimulationReport:
 def run_simulation(
     model=None,
     model_type: str = "lstm",
-    data: PreparedData | None = None,
-    cfg: dict | None = None,
+    data=None,
+    cfg=None,
     skip_training: bool = False,
 ) -> SimulationReport:
     """
@@ -69,6 +66,9 @@ def run_simulation(
     if cfg is None:
         cfg = CFG
     set_seed(cfg["project"]["seed"])
+
+    if model_type not in {"lstm", "tft"}:
+        raise ValueError(f"Unsupported model_type: {model_type}")
 
     # ── 1. Data ──────────────────────────────────────────────────────
     if data is None:
@@ -120,25 +120,33 @@ def run_simulation(
     )
 
     # Inverse-scale predictions and actuals for real-world metrics
-    def _inv(arr):
+    def _inv(arr: np.ndarray) -> np.ndarray:
         shape = arr.shape
         flat = arr.reshape(-1, n_targets)
         inv = target_scaler.inverse_transform(flat)
-        return inv.reshape(shape)
+        return np.asarray(inv).reshape(shape)
 
     actual_mw = _inv(test.y)
     baseline_point_mw = _inv(test_baseline_pred)
 
     baseline_quantiles_mw = {}
-    for q, qpred in baseline_result.quantiles.items():
+    for q, _ in baseline_result.quantiles.items():
         # Need to recompute on test
-        q_offset = np.quantile(data.train.y - moving_average_forecast(
-            data.train.y, horizon, min(baseline_result.best_window, data.train.y.shape[1])
-        ), q, axis=0)
+        q_offset = np.quantile(
+            data.train.y
+            - moving_average_forecast(
+                data.train.y,
+                horizon,
+                min(baseline_result.best_window, data.train.y.shape[1]),
+            ),
+            q,
+            axis=0,
+        )
         baseline_quantiles_mw[q] = _inv(test_baseline_pred + q_offset[np.newaxis, :, :])
 
     baseline_metrics = compute_all_metrics(
-        actual_mw, baseline_point_mw,
+        actual_mw,
+        baseline_point_mw,
         quantile_preds=baseline_quantiles_mw,
         lower_90=baseline_quantiles_mw.get(0.05),
         upper_90=baseline_quantiles_mw.get(0.95),
@@ -148,27 +156,27 @@ def run_simulation(
     if not skip_training and model is not None:
         device = get_device()
         model = model.to(device).eval()
-        
+
         # Process test data in batches to avoid memory overload
         batch_size = 64
-        all_quantiles = {}
-        
+        all_quantiles: dict[float, list[np.ndarray]] = {}
+
         for batch_start in range(0, len(test.X), batch_size):
             batch_end = min(batch_start + batch_size, len(test.X))
             X_batch = torch.as_tensor(test.X[batch_start:batch_end], dtype=torch.float32).to(device)
-            
+
             with torch.no_grad():
                 batch_preds = model.predict_quantiles(X_batch)
-            
+
             for q, pred_tensor in batch_preds.items():
                 pred_np = pred_tensor.cpu().numpy()
                 if q not in all_quantiles:
                     all_quantiles[q] = []
                 all_quantiles[q].append(pred_np)
-        
+
         # Concatenate batches
         q_preds_scaled = {q: np.vstack(all_quantiles[q]) for q in all_quantiles}
-        
+
         q_preds_mw = {}
         for q, pred_np in q_preds_scaled.items():
             q_preds_mw[q] = _inv(pred_np)
@@ -177,7 +185,8 @@ def run_simulation(
         model_point_mw = q_preds_mw[median_q]
 
         model_metrics = compute_all_metrics(
-            actual_mw, model_point_mw,
+            actual_mw,
+            model_point_mw,
             quantile_preds=q_preds_mw,
             lower_90=q_preds_mw.get(0.05),
             upper_90=q_preds_mw.get(0.95),
@@ -193,8 +202,10 @@ def run_simulation(
     logger.info(
         f"\n{'═' * 60}\n"
         f"  FORECAST ACCURACY COMPARISON:\n"
-        f"  Baseline RMSE:  {baseline_metrics.get('rmse', 0):.4f}  MAE: {baseline_metrics.get('mae', 0):.4f}\n"
-        f"  Model RMSE:     {model_metrics.get('rmse', 0):.4f}  MAE: {model_metrics.get('mae', 0):.4f}\n"
+        f"  Baseline RMSE:  {baseline_metrics.get('rmse', 0):.4f}  "
+        f"MAE: {baseline_metrics.get('mae', 0):.4f}\n"
+        f"  Model RMSE:     {model_metrics.get('rmse', 0):.4f}  "
+        f"MAE: {model_metrics.get('mae', 0):.4f}\n"
         f"{'═' * 60}\n"
     )
 
@@ -212,44 +223,49 @@ def run_simulation(
     baseline_dispatch_last = None
     model_dispatch_last = None
 
-    samples_logged = 0
     for i in range(n_samples):
-        # Total renewable = wind + solar (sum targets)
-        ren_actual = actual_mw[i, :, :].sum(axis=-1)      # (H,)
-        
         # Baseline forecast (moving-average)
         ren_baseline_median = baseline_point_mw[i, :, :].sum(axis=-1)
-        ren_baseline_lower = baseline_quantiles_mw.get(0.05, baseline_quantiles_mw[min(baseline_quantiles_mw)])[i, :, :].sum(axis=-1)
-        ren_baseline_upper = baseline_quantiles_mw.get(0.95, baseline_quantiles_mw[max(baseline_quantiles_mw)])[i, :, :].sum(axis=-1)
-        
+        ren_baseline_lower = baseline_quantiles_mw.get(
+            0.05, baseline_quantiles_mw[min(baseline_quantiles_mw)]
+        )[i, :, :].sum(axis=-1)
+        ren_baseline_upper = baseline_quantiles_mw.get(
+            0.95, baseline_quantiles_mw[max(baseline_quantiles_mw)]
+        )[i, :, :].sum(axis=-1)
+
         # LSTM forecast
         ren_model_median = model_point_mw[i, :, :].sum(axis=-1)
         ren_model_lower = q_preds_mw.get(0.05, q_preds_mw[min(q_preds_mw)])[i, :, :].sum(axis=-1)
         ren_model_upper = q_preds_mw.get(0.95, q_preds_mw[max(q_preds_mw)])[i, :, :].sum(axis=-1)
 
         # Synthetic demand & price: create scenarios where forecast quality matters
-        # Pattern: baseline forecast has systematic biases, LSTM learns corrected patterns
+        # Pattern: baseline forecast has systematic biases, LSTM learns corrected
+        # patterns
         rng = np.random.default_rng(cfg["project"]["seed"] + i)
-        
+
         # Base pattern: morning peak, afternoon valley, evening peak
-        hour_weights = 0.5 * np.sin(2 * np.pi * np.arange(horizon) / 24) + \
-                       0.5 * np.cos(4 * np.pi * np.arange(horizon) / 24)
+        hour_weights = 0.5 * np.sin(2 * np.pi * np.arange(horizon) / 24) + 0.5 * np.cos(
+            4 * np.pi * np.arange(horizon) / 24
+        )
         demand = 400 + 200 * (hour_weights + rng.normal(0, 0.05, horizon))
         demand = np.clip(demand, 100, 800)
-        
+
         peak_hours = set(cfg["optimizer"]["peak_hours"])
         price = np.where(
             np.isin(np.arange(horizon) % 24, list(peak_hours)),
             120 + rng.normal(0, 10, horizon),
-            45 + rng.normal(0, 5, horizon)
+            45 + rng.normal(0, 5, horizon),
         )
         price = np.clip(price, 5, 200)
 
         # Baseline dispatch with moving-average forecast
         baseline_dispatch_strat = ForecastDispatch(batt_cfg, cfg)
         baseline_dr = baseline_dispatch_strat.run(
-            ren_baseline_median, ren_baseline_lower, ren_baseline_upper,
-            demand, price,
+            ren_baseline_median,
+            ren_baseline_lower,
+            ren_baseline_upper,
+            demand,
+            price,
         )
         total_baseline_curtailment += baseline_dr.total_curtailment_mwh
         total_baseline_revenue += baseline_dr.total_revenue
@@ -257,8 +273,11 @@ def run_simulation(
         # LSTM-driven forecast-aware dispatch
         smart = ForecastDispatch(batt_cfg, cfg)
         model_dr = smart.run(
-            ren_model_median, ren_model_lower, ren_model_upper,
-            demand, price,
+            ren_model_median,
+            ren_model_lower,
+            ren_model_upper,
+            demand,
+            price,
         )
         total_model_curtailment += model_dr.total_curtailment_mwh
         total_model_revenue += model_dr.total_revenue
@@ -280,6 +299,9 @@ def run_simulation(
     # ── 6. Calibration ───────────────────────────────────────────────
     forecast = extract_intervals(q_preds_mw, levels=[0.50, 0.90])
     cal = calibration_report(forecast, actual_mw)
+
+    assert baseline_dispatch_last is not None
+    assert model_dispatch_last is not None
 
     return SimulationReport(
         baseline_metrics=baseline_metrics,

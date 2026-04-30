@@ -16,8 +16,6 @@ This is a *self-contained* implementation (no external TFT library
 dependency) so the architecture is fully visible and hackable.
 """
 
-from __future__ import annotations
-
 import math
 
 import pytorch_lightning as pl
@@ -28,10 +26,10 @@ import torch.nn.functional as F
 from greengrid.models.lstm_model import quantile_loss
 from greengrid.settings import CFG
 
-
 # ═══════════════════════════════════════════════════════════════════════
 #  Building Blocks
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class GatedLinearUnit(nn.Module):
     """GLU activation: σ(Wx + b) ⊙ (Vx + c)."""
@@ -51,7 +49,13 @@ class GatedResidualNetwork(nn.Module):
     out = LayerNorm(x + GLU(ELU(W1·x + W2·c + b)))
     """
 
-    def __init__(self, d_model: int, d_hidden: int, dropout: float = 0.1, context_dim: int | None = None):
+    def __init__(
+        self,
+        d_model: int,
+        d_hidden: int,
+        dropout: float = 0.1,
+        context_dim: int | None = None,
+    ):
         super().__init__()
         self.fc1 = nn.Linear(d_model, d_hidden)
         self.context_proj = nn.Linear(context_dim, d_hidden, bias=False) if context_dim else None
@@ -81,9 +85,9 @@ class VariableSelectionNetwork(nn.Module):
         super().__init__()
         self.n_vars = n_vars
         self.flattened_grn = GatedResidualNetwork(n_vars * d_model, d_hidden, dropout)
-        self.var_grns = nn.ModuleList([
-            GatedResidualNetwork(d_model, d_hidden, dropout) for _ in range(n_vars)
-        ])
+        self.var_grns = nn.ModuleList(
+            [GatedResidualNetwork(d_model, d_hidden, dropout) for _ in range(n_vars)]
+        )
         self.gate = nn.Linear(n_vars * d_model, n_vars)
         self.softmax = nn.Softmax(dim=-1)
 
@@ -93,20 +97,22 @@ class VariableSelectionNetwork(nn.Module):
         Returns: (B, T, d_model),  (B, T, n_vars)  — weights
         """
         B, T, V, D = x.shape
-        flat = x.reshape(B, T, V * D)                       # (B, T, V*D)
-        weights = self.softmax(self.gate(flat))              # (B, T, V)
+        flat = x.reshape(B, T, V * D)  # (B, T, V*D)
+        weights = self.softmax(self.gate(flat))  # (B, T, V)
 
-        var_outputs = []
+        var_outputs_list = []
         for i in range(self.n_vars):
-            var_outputs.append(self.var_grns[i](x[:, :, i, :]))  # (B, T, D)
-        var_outputs = torch.stack(var_outputs, dim=2)        # (B, T, V, D)
+            var_outputs_list.append(self.var_grns[i](x[:, :, i, :]))  # (B, T, D)
+        var_outputs = torch.stack(var_outputs_list, dim=2)  # (B, T, V, D)
 
         combined = (weights.unsqueeze(-1) * var_outputs).sum(dim=2)  # (B, T, D)
         return combined, weights
 
 
 class InterpretableMultiHeadAttention(nn.Module):
-    """Multi-head attention that shares value weights across heads for interpretability."""
+    """Multi-head attention that shares value weights across heads for
+    interpretability.
+    """
 
     def __init__(self, d_model: int, n_heads: int, dropout: float = 0.1):
         super().__init__()
@@ -119,7 +125,9 @@ class InterpretableMultiHeadAttention(nn.Module):
         self.out_proj = nn.Linear(self.d_k, d_model)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         B, T, _ = q.shape
 
         Q = self.W_q(q).view(B, T, self.n_heads, self.d_k).transpose(1, 2)  # (B, H, T, dk)
@@ -127,11 +135,11 @@ class InterpretableMultiHeadAttention(nn.Module):
         V = self.W_v(v)  # (B, T, dk)  — shared
 
         scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
-        attn = self.dropout(F.softmax(scores, dim=-1))       # (B, H, T, T)
+        attn = self.dropout(F.softmax(scores, dim=-1))  # (B, H, T, T)
 
         # Apply attention to shared values
         V_exp = V.unsqueeze(1).expand(-1, self.n_heads, -1, -1)  # (B, H, T, dk)
-        context = torch.matmul(attn, V_exp).mean(dim=1)          # (B, T, dk)
+        context = torch.matmul(attn, V_exp).mean(dim=1)  # (B, T, dk)
         out = self.out_proj(context)
         return out, attn.mean(dim=1)  # average attention across heads
 
@@ -139,6 +147,7 @@ class InterpretableMultiHeadAttention(nn.Module):
 # ═══════════════════════════════════════════════════════════════════════
 #  Full TFT Model
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TemporalFusionTransformer(pl.LightningModule):
     """
@@ -165,6 +174,7 @@ class TemporalFusionTransformer(pl.LightningModule):
         self.quantiles = quantiles or CFG["models"]["tft"]["quantiles"]
         self.n_targets = n_targets
         self.horizon = horizon
+        self.hidden_size = hidden_size
         self.learning_rate = learning_rate
         self.n_quantiles = len(self.quantiles)
 
@@ -194,7 +204,7 @@ class TemporalFusionTransformer(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, F = x.shape
-        d = self.hparams.hidden_size
+        d = self.hidden_size
 
         # Embed each feature to d_model
         embedded = self.input_proj(x).view(B, T, F, d)  # (B, T, F, d)
@@ -234,7 +244,9 @@ class TemporalFusionTransformer(pl.LightningModule):
         pred = self(x)
         loss = quantile_loss(pred, y, self.quantiles)
         self.log("val_loss", loss, prog_bar=True)
-        median_idx = self.quantiles.index(0.50) if 0.50 in self.quantiles else len(self.quantiles) // 2
+        median_idx = (
+            self.quantiles.index(0.50) if 0.50 in self.quantiles else len(self.quantiles) // 2
+        )
         point = pred[:, :, :, median_idx]
         rmse = torch.sqrt(((point - y) ** 2).mean())
         self.log("val_rmse", rmse, prog_bar=True)
@@ -248,7 +260,7 @@ class TemporalFusionTransformer(pl.LightningModule):
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-5)
         sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opt, T_0=10, T_mult=2)
-        return {"optimizer": opt, "lr_scheduler": {"scheduler": sched}}
+        return [opt], [sched]
 
     @torch.no_grad()
     def predict_quantiles(self, x: torch.Tensor) -> dict[float, torch.Tensor]:
@@ -258,8 +270,8 @@ class TemporalFusionTransformer(pl.LightningModule):
 
     def get_variable_importances(self) -> torch.Tensor:
         """Return mean variable-selection weights from last forward pass."""
-        return self._var_weights.mean(dim=(0, 1))  # (n_vars,)
+        return self._var_weights.mean(dim=(0, 1))
 
     def get_attention_weights(self) -> torch.Tensor:
         """Return mean temporal attention weights from last forward pass."""
-        return self._attn_weights.mean(dim=0)  # (T, T)
+        return self._attn_weights.mean(dim=0)

@@ -2,8 +2,8 @@
 Tests for forecasting models.
 """
 
-import torch
 import pytest
+import torch
 
 from greengrid.models.lstm_model import ProbabilisticLSTM, quantile_loss
 from greengrid.models.tft_model import TemporalFusionTransformer
@@ -26,9 +26,14 @@ class TestQuantileLoss:
 class TestLSTM:
     def test_output_shape(self):
         model = ProbabilisticLSTM(
-            n_features=11, n_targets=2, horizon=24,
-            hidden_size=32, num_layers=1, dropout=0.0,
-            bidirectional=False, quantiles=[0.1, 0.5, 0.9],
+            n_features=11,
+            n_targets=2,
+            horizon=24,
+            hidden_size=32,
+            num_layers=1,
+            dropout=0.0,
+            bidirectional=False,
+            quantiles=[0.1, 0.5, 0.9],
         )
         x = torch.randn(4, 168, 11)
         out = model(x)
@@ -36,8 +41,12 @@ class TestLSTM:
 
     def test_predict_quantiles(self):
         model = ProbabilisticLSTM(
-            n_features=11, n_targets=2, horizon=24,
-            hidden_size=32, num_layers=1, dropout=0.0,
+            n_features=11,
+            n_targets=2,
+            horizon=24,
+            hidden_size=32,
+            num_layers=1,
+            dropout=0.0,
             quantiles=[0.1, 0.5, 0.9],
         )
         x = torch.randn(2, 168, 11)
@@ -49,8 +58,12 @@ class TestLSTM:
 class TestTFT:
     def test_output_shape(self):
         model = TemporalFusionTransformer(
-            n_features=11, n_targets=2, horizon=24,
-            hidden_size=32, n_heads=2, dropout=0.0,
+            n_features=11,
+            n_targets=2,
+            horizon=24,
+            hidden_size=32,
+            n_heads=2,
+            dropout=0.0,
             quantiles=[0.1, 0.5, 0.9],
         )
         x = torch.randn(4, 168, 11)
@@ -59,8 +72,12 @@ class TestTFT:
 
     def test_variable_importances(self):
         model = TemporalFusionTransformer(
-            n_features=11, n_targets=2, horizon=24,
-            hidden_size=32, n_heads=2, dropout=0.0,
+            n_features=11,
+            n_targets=2,
+            horizon=24,
+            hidden_size=32,
+            n_heads=2,
+            dropout=0.0,
             quantiles=[0.1, 0.5, 0.9],
         )
         x = torch.randn(2, 168, 11)

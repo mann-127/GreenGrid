@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from greengrid.data.generator import generate_dataset
-from greengrid.data.preprocessing import prepare_data, TimeSeriesDataset, build_dataloaders
+from greengrid.data.preprocessing import (
+    TimeSeriesDataset,
+    build_dataloaders,
+    prepare_data,
+)
 from greengrid.settings import CFG
 
 
@@ -51,7 +55,7 @@ class TestPreprocessing:
         assert len(ds) == len(small_data.train.X)
 
     def test_dataloaders(self, small_data):
-        tl, vl, tel = build_dataloaders(small_data, batch_size=16)
+        tl, _, _ = build_dataloaders(small_data, batch_size=16)
         batch = next(iter(tl))
         assert len(batch) == 2
         assert batch[0].shape[0] <= 16

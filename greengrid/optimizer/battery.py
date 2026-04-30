@@ -5,9 +5,7 @@ Simulates the physical state of a lithium-ion battery pack and enforces
 operational constraints (SoC limits, charge/discharge rates, efficiency).
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 from loguru import logger
@@ -18,11 +16,12 @@ from greengrid.settings import CFG
 @dataclass
 class BatteryState:
     """Snapshot of battery at a single time-step."""
-    soc: float              # state-of-charge [0, 1]
-    energy_mwh: float       # absolute stored energy
-    charge_mw: float        # positive = charging
-    discharge_mw: float     # positive = discharging
-    cycle_count: float      # cumulative fractional cycles
+
+    soc: float  # state-of-charge [0, 1]
+    energy_mwh: float  # absolute stored energy
+    charge_mw: float  # positive = charging
+    discharge_mw: float  # positive = discharging
+    cycle_count: float  # cumulative fractional cycles
 
 
 @dataclass
@@ -30,14 +29,14 @@ class BatteryConfig:
     capacity_mwh: float = 200.0
     max_charge_mw: float = 50.0
     max_discharge_mw: float = 50.0
-    efficiency: float = 0.88          # round-trip
+    efficiency: float = 0.88  # round-trip
     min_soc: float = 0.10
     max_soc: float = 0.95
     degradation_per_cycle: float = 0.0001
     calendar_aging_per_hour: float = 0.000002  # NEW: Time-based degradation
 
     @classmethod
-    def from_cfg(cls, cfg: dict | None = None) -> BatteryConfig:
+    def from_cfg(cls, cfg=None):
         b = (cfg or CFG)["data_generation"]["battery"]
         return cls(
             capacity_mwh=b["capacity_mwh"],
@@ -48,7 +47,9 @@ class BatteryConfig:
             max_soc=b["max_soc"],
             degradation_per_cycle=(cfg or CFG)["optimizer"]["storage_degradation_per_cycle"],
             # Fetch calendar aging if it exists in config, otherwise use default
-            calendar_aging_per_hour=(cfg or CFG).get("optimizer", {}).get("calendar_aging_per_hour", 0.000002),
+            calendar_aging_per_hour=(cfg or CFG)
+            .get("optimizer", {})
+            .get("calendar_aging_per_hour", 0.000002),
         )
 
 
@@ -71,9 +72,9 @@ class Battery:
         """Capacity degrades with both cycling and calendar aging."""
         cycle_degradation = self.cfg.degradation_per_cycle * self.cycle_count
         calendar_degradation = self.cfg.calendar_aging_per_hour * self.total_hours_operated
-        
+
         # Ensure health doesn't drop below 0 (0% capacity)
-        total_health = max(0.0, 1.0 - cycle_degradation - calendar_degradation) 
+        total_health = max(0.0, 1.0 - cycle_degradation - calendar_degradation)
         return self.cfg.capacity_mwh * total_health
 
     def step(self, action_mw: float, dt_hours: float = 1.0) -> BatteryState:
@@ -82,8 +83,10 @@ class Battery:
         Enforces all physical constraints:
           • Rate limits: max charge/discharge rates (MW)
           • SoC bounds: min/max state-of-charge [min_soc, max_soc]
-          • Round-trip efficiency: losses proportional to sqrt(efficiency)
-          • Degradation: tracks cycle count for capacity fade and time for calendar aging
+          • Round-trip efficiency: η_charge = η_discharge = √η_rt
+            (symmetric split)
+          • Degradation: tracks cycle count for capacity fade and time for
+            calendar aging
 
         Args:
             action_mw: Power request in MW.
@@ -95,8 +98,8 @@ class Battery:
             BatteryState after action with all values clipped to constraints.
         """
         # NEW: Increment the total operational time for calendar aging
-        self.total_hours_operated += dt_hours 
-        
+        self.total_hours_operated += dt_hours
+
         cap = self.effective_capacity
         soc_before = self.soc
 
@@ -108,32 +111,38 @@ class Battery:
                 f"clipped={action_mw_clipped:.2f}MW"
             )
 
+        eta = np.sqrt(self.cfg.efficiency)  # symmetric split: η_c = η_d = √η_rt
+
         if action_mw_clipped >= 0:
-            # Charging: account for round-trip efficiency loss
-            energy_in = action_mw_clipped * dt_hours * np.sqrt(self.cfg.efficiency)
+            # Charging: energy stored = power × time × η_c (losses on the way in)
+            energy_in = action_mw_clipped * dt_hours * eta
             max_energy_in = (self.cfg.max_soc - self.soc) * cap
             energy_in = min(energy_in, max(max_energy_in, 0))
-            actual_charge = energy_in / (np.sqrt(self.cfg.efficiency) * dt_hours) if dt_hours > 0 else 0
+            # Back-calculate actual source power after SoC-limit clamping
+            actual_charge = energy_in / (eta * dt_hours) if dt_hours > 0 else 0
             self.soc += energy_in / cap
             charge_mw, discharge_mw = actual_charge, 0.0
         else:
-            # Discharging
-            energy_out = abs(action_mw_clipped) * dt_hours * np.sqrt(self.cfg.efficiency)
+            # Discharging: battery must release more energy than delivered to grid
+            # energy_removed_from_battery = power_delivered × dt / η_d
+            energy_out = abs(action_mw_clipped) * dt_hours / eta
             max_energy_out = (self.soc - self.cfg.min_soc) * cap
             energy_out = min(energy_out, max(max_energy_out, 0))
-            actual_discharge = energy_out / (np.sqrt(self.cfg.efficiency) * dt_hours) if dt_hours > 0 else 0
+            # Back-calculate actual power delivered to grid after SoC-limit clamping
+            actual_discharge = energy_out * eta / dt_hours if dt_hours > 0 else 0
             self.soc -= energy_out / cap
             charge_mw, discharge_mw = 0.0, actual_discharge
 
-        # Track degradation via cycle counting (each full cycle = 2× capacity throughput)
+        # Track degradation via cycle counting
+        # (each full cycle = 2× capacity throughput)
         energy_throughput = max(charge_mw, discharge_mw) * dt_hours
         self.cycle_count += energy_throughput / (2 * cap)
 
-        # Enforce SoC bounds
+        # Enforce SoC bounds; record whether the clip actually fired
+        soc_before_clip = self.soc
         self.soc = np.clip(self.soc, self.cfg.min_soc, self.cfg.max_soc)
-        soc_clipped = self.soc != (charge_mw - discharge_mw) * dt_hours / cap + soc_before
-        if soc_clipped:
-            logger.debug(f"[battery] SoC clipping: {soc_before:.2%} | {self.soc:.2%}")
+        if not np.isclose(self.soc, soc_before_clip):
+            logger.debug(f"[battery] SoC clipping: {soc_before:.2%} -> {self.soc:.2%}")
 
         state = BatteryState(
             soc=float(self.soc),
@@ -147,16 +156,17 @@ class Battery:
         logger.debug(
             f"[battery] Step complete: SoC {soc_before:.1%}|{self.soc:.1%}, "
             f"charge={charge_mw:.1f}MW, discharge={discharge_mw:.1f}MW, "
-            f"cycles={self.cycle_count:.2f}, hours_operated={self.total_hours_operated:.1f}"
+            f"cycles={self.cycle_count:.2f}, "
+            f"hours_operated={self.total_hours_operated:.1f}"
         )
         return state
 
-    def reset(self, soc: float = 0.5) -> None:
+    def reset(self, soc: float = 0.5):
         """Reset battery to initial state for a new simulation.
-        
+
         Args:
             soc: Initial state-of-charge [0, 1]. Default 50%.
-        
+
         Clears history, cycle count, and hours operated (for a fresh run).
         """
         self.soc = np.clip(soc, self.cfg.min_soc, self.cfg.max_soc)

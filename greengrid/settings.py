@@ -12,8 +12,6 @@ Environment Variables:
     Any GREENGRID_* variable prefixed value overrides config key.
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 from typing import Any
@@ -26,13 +24,13 @@ _CFG_PATH = Path(__file__).resolve().parent / "config.yaml"
 
 def load_config(path: str | Path | None = None) -> dict[str, Any]:
     """Load and parse YAML configuration file with env-var overrides.
-    
+
     Args:
         path: Optional override path to config file. Defaults to greengrid/config.yaml.
-        
+
     Returns:
         Configuration dictionary merged with environment variable overrides.
-        
+
     Raises:
         FileNotFoundError: If config file not found.
         yaml.YAMLError: If config file has invalid YAML.
@@ -48,10 +46,10 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
     try:
         with open(cfg_path) as fh:
             cfg: dict[str, Any] = yaml.safe_load(fh)
-        logger.info(
-            f"[settings] Loaded config: {cfg_path.name} with "
-            f"{len(cfg)} top-level sections"
-        )
+        logger.info(f"[settings] Loaded config: {cfg_path.name} with {len(cfg)} top-level sections")
+    except PermissionError as e:
+        logger.error(f"[settings] Permission denied reading config: {e}")
+        raise
     except yaml.YAMLError as e:
         logger.error(f"[settings] Failed to parse YAML: {e}")
         raise

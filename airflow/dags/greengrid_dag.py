@@ -139,7 +139,7 @@ def task_run_forecast(**kwargs):
             logger.debug(f"[airflow] task_run_forecast: Loading checkpoint {latest_ckpt.name}")
 
             load_model(latest_ckpt, "lstm")
-            logger.info(f"[airflow] task_run_forecast: Model loaded, ready for inference")
+            logger.info("[airflow] task_run_forecast: Model loaded, ready for inference")
             kwargs["ti"].xcom_push(key="model_loaded", value=True)
         else:
             logger.warning("[airflow] task_run_forecast: No LSTM checkpoint found, skipping forecast")

@@ -17,20 +17,18 @@ Input (batch, seq_len, n_features)
   - Reshape to (batch, horizon, n_targets, n_quantiles)
 """
 
-from __future__ import annotations
-
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 
 from greengrid.settings import CFG
 
-
 # ── Quantile (pinball) loss ──────────────────────────────────────────
+
 
 def quantile_loss(
     predictions: torch.Tensor,  # (B, H, T, Q)
-    targets: torch.Tensor,      # (B, H, T)
+    targets: torch.Tensor,  # (B, H, T)
     quantiles: list[float],
 ) -> torch.Tensor:
     """
@@ -40,12 +38,13 @@ def quantile_loss(
     """
     targets = targets.unsqueeze(-1)  # (B, H, T, 1)
     q_tensor = torch.tensor(quantiles, device=predictions.device).reshape(1, 1, 1, -1)
-    errors = targets - predictions   # (B, H, T, Q)
+    errors = targets - predictions  # (B, H, T, Q)
     loss = torch.max(q_tensor * errors, (q_tensor - 1) * errors)
     return loss.mean()
 
 
 # ── Model ────────────────────────────────────────────────────────────
+
 
 class ProbabilisticLSTM(pl.LightningModule):
     """
@@ -110,11 +109,11 @@ class ProbabilisticLSTM(pl.LightningModule):
         (batch, horizon, n_targets, n_quantiles)
         """
         x = self.layer_norm(x)
-        lstm_out, _ = self.lstm(x)          # (B, S, H*dir)
+        lstm_out, _ = self.lstm(x)  # (B, S, H*dir)
         last = self.dropout(lstm_out[:, -1, :])  # (B, H*dir)
-        out = self.fc(last)                      # (B, horizon*T*Q)
+        out = self.fc(last)  # (B, horizon*T*Q)
         B = x.size(0)
-        return out.view(B, self.horizon, self.n_targets, self.n_quantiles)
+        return out.view(B, self.horizon, self.n_targets, self.n_quantiles).contiguous()
 
     # ── Training step ────────────────────────────────────────────────
     def training_step(self, batch, batch_idx):
@@ -145,10 +144,11 @@ class ProbabilisticLSTM(pl.LightningModule):
     # ── Optimizer ────────────────────────────────────────────────────
     def configure_optimizers(self):
         opt = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=1e-4)
-        sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            opt, T_0=10, T_mult=2, eta_min=1e-6
-        )
-        return {"optimizer": opt, "lr_scheduler": {"scheduler": sched, "interval": "epoch"}}
+        sched = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(opt, T_0=10, T_mult=2, eta_min=1e-6)
+        return {
+            "optimizer": opt,
+            "lr_scheduler": {"scheduler": sched, "interval": "epoch"},
+        }
 
     # ── Convenience ──────────────────────────────────────────────────
     @torch.no_grad()

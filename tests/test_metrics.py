@@ -6,9 +6,14 @@ import numpy as np
 import pytest
 
 from greengrid.evaluation.metrics import (
-    mae, rmse, mape, r_squared,
-    pinball_loss, coverage_probability,
-    curtailment_reduction, revenue_improvement,
+    coverage_probability,
+    curtailment_reduction,
+    mae,
+    mape,
+    pinball_loss,
+    r_squared,
+    revenue_improvement,
+    rmse,
 )
 
 
@@ -36,7 +41,6 @@ class TestProbabilisticMetrics:
     def test_pinball_symmetric(self):
         a = np.zeros(100)
         p = np.ones(100)
-        # q=0.5 → symmetric loss
         assert pinball_loss(a, p, 0.5) == pytest.approx(0.5)
 
     def test_coverage_all_inside(self):

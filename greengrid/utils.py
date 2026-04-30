@@ -2,8 +2,6 @@
 Shared helper utilities used across the GreenGrid codebase.
 """
 
-from __future__ import annotations
-
 import random
 from pathlib import Path
 
@@ -12,7 +10,7 @@ import torch
 from loguru import logger
 
 
-def set_seed(seed: int = 42) -> None:
+def set_seed(seed: int = 42):
     """Deterministic seeding for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)

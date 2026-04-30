@@ -10,8 +10,6 @@ Transforms raw hourly data into windowed tensors ready for training:
 5. PyTorch ``Dataset`` / ``DataLoader`` wrappers
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -25,21 +23,23 @@ from torch.utils.data import DataLoader, Dataset
 
 from greengrid.settings import CFG
 
-
 # ─── Helpers ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class SplitData:
     """Holds arrays and metadata for one split (train / val / test)."""
-    X: np.ndarray          # (N, seq_len, n_features)
-    y: np.ndarray          # (N, horizon, n_targets)
-    timestamps: np.ndarray # (N,)  — timestamp of the *last* step in X
-    raw_df: pd.DataFrame   # un-scaled slice (for plotting)
+
+    X: np.ndarray  # (N, seq_len, n_features)
+    y: np.ndarray  # (N, horizon, n_targets)
+    timestamps: np.ndarray  # (N,)  — timestamp of the *last* step in X
+    raw_df: pd.DataFrame  # un-scaled slice (for plotting)
 
 
 @dataclass
 class PreparedData:
     """Full pipeline output."""
+
     train: SplitData
     val: SplitData
     test: SplitData
@@ -65,17 +65,18 @@ class TimeSeriesDataset(Dataset):
 
 # ─── Core pipeline ───────────────────────────────────────────────────
 
+
 def load_raw(path: str | Path | None = None) -> pd.DataFrame:
     """Load the raw Parquet or CSV dataset from disk.
-    
+
     Tries parquet first (faster), falls back to CSV.
-    
+
     Args:
         path: Optional override path to data directory. Defaults to config.
-        
+
     Returns:
         DataFrame with columns: timestamp, wind_power_mw, solar_power_mw, features.
-        
+
     Raises:
         FileNotFoundError: If neither parquet nor CSV exists.
     """
@@ -85,13 +86,25 @@ def load_raw(path: str | Path | None = None) -> pd.DataFrame:
     pq = data_dir / "greengrid_raw.parquet"
     if pq.exists():
         logger.debug(f"[preprocessing] Reading parquet: {pq}")
-        df = pd.read_parquet(pq)
+        try:
+            df = pd.read_parquet(pq)
+        except Exception as exc:
+            logger.warning(f"[preprocessing] Parquet read failed ({exc}), falling back to CSV")
+            df = None
     else:
+        df = None
+
+    if df is None:
         csv = data_dir / "greengrid_raw.csv"
+        if not csv.exists():
+            raise FileNotFoundError(f"No raw data found. Run 'greengrid generate-data' first. Looked for: {pq}, {csv}")
         logger.debug(f"[preprocessing] Reading CSV: {csv}")
         df = pd.read_csv(csv, parse_dates=["timestamp"])
 
-    logger.info(f"[preprocessing] Loaded raw data: shape={df.shape}, date_range={df['timestamp'].min()} to {df['timestamp'].max()}")
+    logger.info(
+        f"[preprocessing] Loaded raw data: shape={df.shape}, "
+        f"date_range={df['timestamp'].min()} to {df['timestamp'].max()}"
+    )
     return df
 
 
@@ -101,15 +114,15 @@ def _chronological_split(
     val_ratio: float,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Perform strict chronological (no shuffle) train/val/test split.
-    
+
     Critical for time-series: we must never use future data for training.
     Test set is purely out-of-sample temporal data.
-    
+
     Args:
         df: Input dataframe, assumed sorted by timestamp.
         train_ratio: Fraction for training (0-1).
         val_ratio: Fraction for validation (0-1). Test = 1 - train - val.
-        
+
     Returns:
         Tuple of (train_df, val_df, test_df).
     """
@@ -118,27 +131,24 @@ def _chronological_split(
     i_val = i_train + int(n * val_ratio)
 
     logger.debug(
-        f"[preprocessing] Chronological split: train=[0:{i_train}], "
-        f"val=[{i_train}:{i_val}], test=[{i_val}:{n}]"
+        f"[preprocessing] Chronological split: train=[0:{i_train}], val=[{i_train}:{i_val}], test=[{i_val}:{n}]"
     )
     return df.iloc[:i_train], df.iloc[i_train:i_val], df.iloc[i_val:]
 
 
-def _fit_scaler(
-    kind: Literal["standard", "minmax"], train: np.ndarray
-) -> StandardScaler | MinMaxScaler:
+def _fit_scaler(kind: Literal["standard", "minmax"], train: np.ndarray) -> StandardScaler | MinMaxScaler:
     """Fit a scaler (StandardScaler or MinMaxScaler) on training data only.
-    
+
     IMPORTANT: Scaler is fit on training data only to prevent data leakage.
     Same fitted scaler is then applied to val and test.
-    
+
     Args:
         kind: Type of scaler ('standard' or 'minmax').
         train: Training feature array of shape (n_train, n_features).
-        
+
     Returns:
         Fitted scaler object.
-        
+
     Raises:
         ValueError: If kind is not 'standard' or 'minmax'.
     """
@@ -174,6 +184,7 @@ def _create_sequences(
 
 # ─── Public API ──────────────────────────────────────────────────────
 
+
 def prepare_data(
     df: pd.DataFrame | None = None,
     cfg: dict | None = None,
@@ -198,18 +209,14 @@ def prepare_data(
     horizon = pp["forecast_horizon"]
 
     # ── Split ─────────────────────────────────────────────────────────
-    train_df, val_df, test_df = _chronological_split(
-        df, pp["train_ratio"], pp["val_ratio"]
-    )
-    logger.info(
-        f"Split sizes  train={len(train_df):,}  val={len(val_df):,}  test={len(test_df):,}"
-    )
+    train_df, val_df, test_df = _chronological_split(df, pp["train_ratio"], pp["val_ratio"])
+    logger.info(f"Split sizes  train={len(train_df):,}  val={len(val_df):,}  test={len(test_df):,}")
 
     # ── Scale (fit on train only) ─────────────────────────────────────
     feat_scaler = _fit_scaler(pp["scaler"], train_df[feature_cols].values)
     tgt_scaler = _fit_scaler(pp["scaler"], train_df[target_cols].values)
 
-    def _scale(split_df: pd.DataFrame):
+    def _scale(split_df: pd.DataFrame) -> tuple:
         f = feat_scaler.transform(split_df[feature_cols].values)
         t = tgt_scaler.transform(split_df[target_cols].values)
         return f, t
@@ -219,7 +226,7 @@ def prepare_data(
     test_f, test_t = _scale(test_df)
 
     # ── Sequences ─────────────────────────────────────────────────────
-    def _make_split(f, t, raw_df) -> SplitData:
+    def _make_split(f: np.ndarray, t: np.ndarray, raw_df: pd.DataFrame) -> SplitData:
         ts = raw_df["timestamp"].values
         X, y, timestamps = _create_sequences(f, t, ts, seq_len, horizon)
         return SplitData(X=X, y=y, timestamps=timestamps, raw_df=raw_df)
@@ -250,8 +257,15 @@ def build_dataloaders(
     val_loader = DataLoader(val_ds, batch_size=bs, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_ds, batch_size=bs, shuffle=False, num_workers=num_workers)
 
+    if len(train_loader) == 0:
+        raise ValueError(
+            f"Training DataLoader is empty (dataset has {len(train_ds)} samples, "
+            f"batch_size={bs}). Increase dataset size or reduce sequence_length."
+        )
+
     logger.info(
         f"DataLoaders ready  —  batch_size={bs}  |  "
-        f"train_batches={len(train_loader)}  val={len(val_loader)}  test={len(test_loader)}"
+        f"train_batches={len(train_loader)}  val={len(val_loader)}  "
+        f"test={len(test_loader)}"
     )
     return train_loader, val_loader, test_loader

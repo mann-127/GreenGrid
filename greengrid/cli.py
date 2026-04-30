@@ -13,8 +13,6 @@ Usage::
     greengrid dashboard
 """
 
-from __future__ import annotations
-
 import click
 from loguru import logger
 
@@ -28,18 +26,26 @@ def main():
 
 @main.command("generate-data")
 @click.option("--output", default=None, help="Output directory for raw data.")
-@click.option("--real-weather", is_flag=True, help="Fetch real historical weather from Open-Meteo instead of synthetic.")
-def generate_data(output: str | None, real_weather: bool):
+@click.option(
+    "--real-weather",
+    is_flag=True,
+    help="Fetch real historical weather from Open-Meteo instead of synthetic.",
+)
+def generate_data(output, real_weather):
     """Generate synthetic NREL-style weather & power data, or fetch real data.
-    
+
     Creates a multi-year dataset with realistic wind speeds, solar irradiance,
     and energy production profiles. Useful for initial testing and demos.
-    
+
     Args:
         output: Optional output directory. Defaults to config path.
         real_weather: If True, fetches historical data from Open-Meteo API.
     """
-    from greengrid.data.generator import generate_dataset, fetch_real_weather, save_dataset
+    from greengrid.data.generator import (
+        fetch_real_weather,
+        generate_dataset,
+        save_dataset,
+    )
     from greengrid.settings import CFG
 
     logger.info(f"[CLI] Starting data generation (real_weather={real_weather})...")
@@ -49,13 +55,18 @@ def generate_data(output: str | None, real_weather: bool):
             dg = CFG["data_generation"]
             tr = dg["time_range"]
             wind_loc = dg["wind"]["location"]
-            df = fetch_real_weather(tr["start"], tr["end"], wind_loc["latitude"], wind_loc["longitude"])
+            df = fetch_real_weather(
+                tr["start"],
+                tr["end"],
+                wind_loc["latitude"],
+                wind_loc["longitude"],
+            )
             logger.info(f"[CLI] Fetched real weather data: {len(df)} rows")
         else:
             # Generate synthetic data
             df = generate_dataset(CFG)
             logger.debug(f"[CLI] Generated {len(df)} rows")
-        
+
         path = save_dataset(df, output)
         logger.info(f"[CLI] Data saved to {path}")
         click.echo(f"Data saved to {path}")
@@ -66,18 +77,18 @@ def generate_data(output: str | None, real_weather: bool):
 
 @main.command("preprocess")
 @click.option("--input", "input_dir", default=None, help="Raw data directory.")
-def preprocess(input_dir: str | None):
+def preprocess(input_dir):
     """Run the preprocessing pipeline (scaling + windowing).
-    
+
     Transforms raw hourly data into train/val/test sequences ready for model training.
-    
+
     Args:
         input_dir: Optional input data directory. Defaults to config path.
-        
+
     Raises:
         FileNotFoundError: If raw data not found.
     """
-    from greengrid.data.preprocessing import prepare_data, load_raw
+    from greengrid.data.preprocessing import load_raw, prepare_data
 
     logger.info("[CLI] Starting preprocessing...")
     try:
@@ -85,14 +96,11 @@ def preprocess(input_dir: str | None):
         logger.debug(f"[CLI] Loaded {len(df)} raw samples")
 
         data = prepare_data(df)
-        logger.debug(
-            f"[CLI] Splits: train={len(data.train.X)}, val={len(data.val.X)}, test={len(data.test.X)}"
-        )
+        logger.debug(f"[CLI] Splits: train={len(data.train.X)}, val={len(data.val.X)}, test={len(data.test.X)}")
         logger.info(f"[CLI] Preprocessing complete with {len(data.feature_columns)} features")
 
         click.echo(
-            f"Preprocessing complete: "
-            f"train={len(data.train.X):,}  val={len(data.val.X):,}  test={len(data.test.X):,}"
+            f"Preprocessing complete: train={len(data.train.X):,}  val={len(data.val.X):,}  test={len(data.test.X):,}"
         )
     except Exception as e:
         logger.error(f"[CLI] Preprocessing failed: {e}")
@@ -101,19 +109,19 @@ def preprocess(input_dir: str | None):
 
 @main.command("train")
 @click.option("--model", type=click.Choice(["lstm", "tft"]), default="lstm")
-def train(model: str):
+def train(model):
     """Train a forecasting model.
-    
+
     Trains either LSTM or TFT on preprocessed data with PyTorch Lightning.
     Checkpoints are saved to models/checkpoints/.
-    
+
     Args:
         model: Model choice — 'lstm' or 'tft'.
-        
+
     Raises:
         ValueError: If model type not recognized.
     """
-    from greengrid.data.preprocessing import prepare_data, load_raw
+    from greengrid.data.preprocessing import load_raw, prepare_data
     from greengrid.models.trainer import train_lstm, train_tft
 
     logger.info(f"[CLI] Starting {model.upper()} training...")
@@ -126,12 +134,10 @@ def train(model: str):
 
         if model == "lstm":
             logger.info("[CLI] Training LSTM model")
-            trained = train_lstm(data)
-        elif model == "tft":
-            logger.info("[CLI] Training TFT model")
-            trained = train_tft(data)
+            train_lstm(data)
         else:
-            raise ValueError(f"Unknown model: {model}")
+            logger.info("[CLI] Training TFT model")
+            train_tft(data)
 
         logger.info(f"[CLI] {model.upper()} training complete")
         click.echo(f"{model.upper()} training complete.")
@@ -142,18 +148,24 @@ def train(model: str):
 
 @main.command("simulate")
 @click.option("--skip-training", is_flag=True, help="Use baseline only (fast mode).")
-@click.option("--model", type=click.Choice(["lstm", "tft"]), default="lstm", help="Model type to load.")
-def simulate(skip_training: bool, model: str):
+@click.option(
+    "--model",
+    type=click.Choice(["lstm", "tft"]),
+    default="lstm",
+    help="Model type to load.",
+)
+def simulate(skip_training, model):
     """Run the full simulation & evaluation pipeline.
-    
+
     Executes end-to-end: baseline -> forecast -> dispatch -> metrics.
     Reports curtailment reduction, revenue improvement, and success status.
-    
+
     Args:
         skip_training: If True, skip AI models and use baseline only.
         model: Model type to load (lstm or tft).
     """
     from pathlib import Path
+
     from greengrid.evaluation.simulation import run_simulation
     from greengrid.models.trainer import load_model
 
@@ -167,14 +179,15 @@ def simulate(skip_training: bool, model: str):
                 # Find best checkpoint for the specified model type
                 checkpoints = list(checkpoint_dir.glob(f"{model}-epoch=*.ckpt"))
                 if checkpoints:
-                    # Sort by val_loss (lower is better) extracted from filename
-                    def extract_val_loss(p):
-                        # Extract val_loss value, handling cases like "0.0660-v1"
-                        loss_str = p.stem.split("val_loss=")[1]
-                        # Remove any suffix after the number (e.g., "-v1")
-                        loss_value = loss_str.split("-")[0] if "-" in loss_str else loss_str
-                        return float(loss_value)
-                    
+
+                    def extract_val_loss(p: Path) -> float:
+                        try:
+                            loss_str = p.stem.split("val_loss=")[1]
+                            loss_value = loss_str.split("-")[0] if "-" in loss_str else loss_str
+                            return float(loss_value)
+                        except (IndexError, ValueError):
+                            return float("inf")
+
                     best_ckpt = min(checkpoints, key=extract_val_loss)
                     logger.info(f"[CLI] Loading checkpoint: {best_ckpt.name}")
                     trained_model = load_model(best_ckpt, model_type=model)
@@ -183,14 +196,12 @@ def simulate(skip_training: bool, model: str):
             else:
                 logger.warning(f"[CLI] Checkpoint directory not found: {checkpoint_dir}")
 
-        report = run_simulation(
-            model=trained_model,
-            model_type=model,
-            skip_training=skip_training
-        )
+        report = run_simulation(model=trained_model, model_type=model, skip_training=skip_training)
         logger.info(
-            f"[CLI] Simulation complete: curtailment_reduction={report.curtailment_reduction_pct:.1f}%, "
-            f"revenue_improvement={report.revenue_improvement_pct:.1f}%, target_met={report.target_met}"
+            "[CLI] Simulation complete: "
+            f"curtailment_reduction={report.curtailment_reduction_pct:.1f}%, "
+            f"revenue_improvement={report.revenue_improvement_pct:.1f}%, "
+            f"target_met={report.target_met}"
         )
 
         click.echo(f"\n{'═' * 50}")
@@ -205,12 +216,12 @@ def simulate(skip_training: bool, model: str):
 
 @main.command("dashboard")
 @click.option("--port", default=8501, help="Streamlit port.")
-def dashboard(port: int):
+def dashboard(port):
     """Launch the Streamlit dashboard.
-    
+
     Starts the interactive Streamlit web app for visualization and monitoring.
     Use Ctrl+C to stop.
-    
+
     Args:
         port: Port number for the web server.
     """
@@ -224,9 +235,16 @@ def dashboard(port: int):
 
     try:
         subprocess.run(
-            [sys.executable, "-m", "streamlit", "run", str(app_path),
-             "--server.port", str(port)],
-            check=False  # Don't raise on exit
+            [
+                sys.executable,
+                "-m",
+                "streamlit",
+                "run",
+                str(app_path),
+                "--server.port",
+                str(port),
+            ],
+            check=False,  # Don't raise on exit
         )
     except Exception as e:
         logger.error(f"[CLI] Dashboard launch failed: {e}")

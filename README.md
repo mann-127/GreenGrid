@@ -71,10 +71,10 @@ docker compose up -d
 ## Configuration
 All central settings live in `greengrid/config.yaml`. You can tune physical battery constraints directly in this file, including `calendar_aging_per_hour` and the financial `cycle_penalty_cost_mwh`.
 
-Override any value with env vars prefixed `GREENGRID_` (e.g., `GREENGRID_SEED=42`).
+Override the random seed with `GREENGRID_SEED=42`. Other config values must be edited directly in `config.yaml`.
 
 ## Outputs
-Generated data, checkpoints, logs, and results are created at runtime and are ignored by git. The repository keeps a single sample dataset at `data/raw/greengrid_raw.csv`.
+Generated data, checkpoints, logs, and results are created at runtime and are gitignored. Run `greengrid generate-data` to populate `data/raw/` before training.
 
 ## Project layout
 ```text
@@ -115,9 +115,10 @@ uv run pytest -v
 ```
 
 ## Testing
-The project includes a robust testing suite ensuring both software logic and physical hardware constraints (like SoC boundaries and degradation math) are strictly met.
+Tests cover battery physics constraints, dispatch logic, metrics, data generation, and preprocessing. Run the full suite with coverage:
 ```bash
-uv run pytest --cov=greengrid --cov-report=term-missing
+make cov
+# or: uv run pytest --cov=greengrid --cov-report=term-missing
 ```
 
 ## License

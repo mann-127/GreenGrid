@@ -8,29 +8,28 @@ Post-processing & analysis of quantile forecasts:
   • Confidence-band formatting for reports
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import numpy as np
-import torch
 from loguru import logger
 
 
 @dataclass
 class PredictionInterval:
     """One named prediction interval (e.g., 90 %)."""
-    level: float           # e.g. 0.90
-    lower: np.ndarray      # (N, horizon, n_targets)
+
+    level: float  # e.g. 0.90
+    lower: np.ndarray  # (N, horizon, n_targets)
     upper: np.ndarray
-    point: np.ndarray      # median
+    point: np.ndarray  # median
 
 
 @dataclass
 class ProbabilisticForecast:
     """Full probabilistic forecast with multiple intervals."""
-    point: np.ndarray                     # median (N, H, T)
-    quantiles: dict[float, np.ndarray]    # q: (N, H, T)
+
+    point: np.ndarray  # median (N, H, T)
+    quantiles: dict[float, np.ndarray]  # q: (N, H, T)
     intervals: list[PredictionInterval]
 
 
@@ -63,12 +62,14 @@ def extract_intervals(
         # Find closest available quantiles
         lower_q = min(available_q, key=lambda q: abs(q - alpha))
         upper_q = min(available_q, key=lambda q: abs(q - (1 - alpha)))
-        intervals.append(PredictionInterval(
-            level=level,
-            lower=quantile_preds[lower_q],
-            upper=quantile_preds[upper_q],
-            point=point,
-        ))
+        intervals.append(
+            PredictionInterval(
+                level=level,
+                lower=quantile_preds[lower_q],
+                upper=quantile_preds[upper_q],
+                point=point,
+            )
+        )
         logger.debug(f"  PI {level:.0%}: q_lower={lower_q}, q_upper={upper_q}")
 
     return ProbabilisticForecast(
@@ -116,10 +117,7 @@ def calibration_report(
         emp = empirical_coverage(actual, pi.lower, pi.upper)
         gap = emp - pi.level
         report[pi.level] = {"nominal": pi.level, "empirical": emp, "gap": gap}
-        logger.info(
-            f"  PI {pi.level:.0%}:  empirical={emp:.3f}  "
-            f"nominal={pi.level:.3f}  gap={gap:+.3f}"
-        )
+        logger.info(f"  PI {pi.level:.0%}:  empirical={emp:.3f}  nominal={pi.level:.3f}  gap={gap:+.3f}")
     return report
 
 

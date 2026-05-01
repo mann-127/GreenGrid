@@ -58,7 +58,7 @@
         <mxCell id="baseline" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontColor=#1b5e20;" value="&lt;b&gt;Moving Average Baseline&lt;/b&gt;" vertex="1">
           <mxGeometry height="30" width="180" x="690" y="460" as="geometry" />
         </mxCell>
-        <mxCell id="forecast-output" parent="1" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#1b5e20;" value="&lt;b&gt;24-Hour Probabilistic Forecasts&lt;/b&gt;&lt;br&gt;(P05 / P50 / P95 Quantiles)" vertex="1">
+        <mxCell id="forecast-output" parent="1" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#e8f5e9;strokeColor=#43a047;fontColor=#1b5e20;" value="&lt;b&gt;24-Hour Probabilistic Forecasts&lt;/b&gt;&lt;br&gt;(P05 / P25 / P50 / P75 / P95 Quantiles)" vertex="1">
           <mxGeometry height="80" width="220" x="670" y="550" as="geometry" />
         </mxCell>
         <mxCell id="zone-opt" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b0bec5;strokeWidth=2;dashed=1;arcSize=5;" value="" vertex="1">
@@ -85,7 +85,7 @@
         <mxCell id="dashboard" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00897b;fontColor=#004d40;align=center;verticalAlign=top;spacingTop=10;" value="&lt;b&gt;Streamlit Dashboard&lt;/b&gt;&lt;br&gt;&lt;hr&gt;&lt;ul style=&quot;text-align: left;&quot;&gt;&lt;li&gt;Interactive Forecasts&lt;/li&gt;&lt;li&gt;Hardware Health Tracking&lt;/li&gt;&lt;li&gt;Financial Metrics&lt;/li&gt;&lt;/ul&gt;" vertex="1">
           <mxGeometry height="130" width="200" x="1290" y="320" as="geometry" />
         </mxCell>
-        <mxCell id="cli" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00897b;fontColor=#004d40;" value="&lt;b&gt;GreenGrid CLI&lt;/b&gt;&lt;br&gt;train | simulate | dashboard" vertex="1">
+        <mxCell id="cli" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00897b;fontColor=#004d40;" value="&lt;b&gt;GreenGrid CLI&lt;/b&gt;&lt;br&gt;generate-data | train | simulate | dashboard" vertex="1">
           <mxGeometry height="60" width="200" x="1290" y="480" as="geometry" />
         </mxCell>
         <mxCell id="docker" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#e0f2f1;strokeColor=#00897b;fontColor=#004d40;" value="&lt;b&gt;Docker / Compose&lt;/b&gt;&lt;br&gt;Containerized Deployment" vertex="1">

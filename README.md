@@ -1,8 +1,11 @@
 # GreenGrid: Renewable Energy Dispatch Optimizer
 
-![Python Version](https://img.shields.io/badge/python-3.13+-green.svg)
-![Code Size](https://img.shields.io/github/languages/code-size/mann-127/GreenGrid)
-![GitHub Stars](https://img.shields.io/github/stars/mann-127/GreenGrid?style=social)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-green.svg)](...)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
+[![CI](https://github.com/mann-127/BladeRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/mann-127/BladeRunner/actions)
+[![Permissions: Standard](https://img.shields.io/badge/permissions-standard-orange.svg)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ![System Architecture](assets/system-architecture.png)
 
@@ -23,9 +26,6 @@ Renewable energy sources like wind and solar are highly intermittent. When energ
 - **Degradation-aware** battery dispatch strategies (Cycle & Calendar aging)
 - Interactive Streamlit visualization dashboard tracking financial and hardware metrics
 - Automated Airflow orchestration and Docker support
-
-## Dashboard
-![GreenGrid Streamlit Dashboard](assets/dashboard-preview.png)
 
 ---
 
@@ -54,8 +54,10 @@ The entire pipeline can be executed via the unified CLI:
 ```bash
 greengrid generate-data                  # Generate synthetic weather & power data
 greengrid generate-data --real-weather   # OR fetch real historical weather via API
-greengrid train --model lstm             # Train the forecasting model
+greengrid train --model lstm             # Train the forecasting model (lstm or tft)
 greengrid simulate                       # Run the degradation-aware dispatch simulation
+greengrid simulate --model tft           # Use TFT model for simulation
+greengrid simulate --skip-training       # Baseline-only mode (no model required)
 greengrid dashboard                      # Launch the interactive UI
 ```
 
@@ -80,6 +82,8 @@ Generated data, checkpoints, logs, and results are created at runtime and are gi
 ```text
 ├── greengrid/            # Core Python package
 │   ├── config.yaml       # Central configuration parameters
+│   ├── settings.py       # Config loader with env-var overrides
+│   ├── utils.py          # Shared helpers (seeding, device, paths)
 │   ├── cli.py            # Unified command-line interface
 │   ├── data/             # API fetching & synthetic generation
 │   ├── models/           # LSTM, TFT, and baseline models
@@ -88,7 +92,7 @@ Generated data, checkpoints, logs, and results are created at runtime and are gi
 │   └── dashboard/        # Streamlit interactive UI
 │
 ├── airflow/dags/         # Automated orchestration pipelines
-├── assets/        # Architecture flowcharts & visuals
+├── assets/               # Architecture flowcharts & visuals
 ├── tests/                # Pytest suite (Logic & Physics constraints)
 │
 ├── Dockerfile            # Multi-stage container build
@@ -102,6 +106,7 @@ Generated data, checkpoints, logs, and results are created at runtime and are gi
 ```bash
 make install       # Install with dev deps
 make lint          # Ruff linting
+make fix           # Ruff linting with auto-fix
 make format        # Auto-format code
 make test          # Run pytest suite
 make clean         # Remove caches
